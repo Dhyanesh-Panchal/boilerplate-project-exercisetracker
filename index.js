@@ -3,6 +3,8 @@ const app = express()
 const cors = require('cors')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose');
+const User = require('./models/User');
+const Exercise = require('./models/Exercise');
 require('dotenv').config()
 
 
@@ -12,36 +14,8 @@ mongoose.connect(process.env.DB_URL, { useNewUrlParser: true, useUnifiedTopology
   console.log(err);
 })
 
-const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true
-  }
-})
 
-const exerciseSchema = new mongoose.Schema({
-  user_id:{
-    type:String,
-    required:true  
-  },
-  description:{
-    type:String,
-    required:true
-  },
-  duration:{
-    type:Number,
-    required:true
-  },
-  date:{
-    type:Date,
-    required:true
-  }
-})
-
-let User = new mongoose.model('User', userSchema);
-
-let Exercise = new mongoose.model('Exercise',exerciseSchema);
+//User Functions
 const findUsers = async (name = '') => {
   //Request for all users
   if (!name) {
@@ -60,26 +34,45 @@ const createUser = async (name) => {
   return newUser;
 }
 
+
+// Exercise functions
 const findExercise = async () => {
-  
+
 }
 
-const createExercise = async (user_id,description,duration,date) => {
-  const newExercise= await User.create({
-    user_id:user_id,
-    description:description,
-    duration:duration,
-    date: new Date(date)
-  })
-  console.log('new Exercise created');
-  return newExercise;
+const createExercise = async (user_id, description, duration, date) => {
+  let userDetails = await User.find({ _id: user_id });
+  console.log('Exercise for: ', userDetails);
+  console.log('User ID is: ', user_id);
+  // console.log(userDetails);
+  if (userDetails.length != 0) {
+    console.log('user Exist!');
+    const newExercise = await Exercise.create({
+      user_id: user_id,
+      username: userDetails[0].username,
+      description: description,
+      duration: duration,
+      date: (date) ? (new Date(date)) : (new Date())
+    })
+    newExercise.save();
+    console.log('new Exercise created');
+    return newExercise;
+  }
+  else {
+    console.log('user DONT EXIST');
+    return null;
+  }
 }
+
+
 
 app.use(cors())
 app.use(express.static('public'))
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
 });
+
+
 
 app.get('/api/users', async (req, res) => {
   let allUsers = await findUsers();
@@ -88,6 +81,7 @@ app.get('/api/users', async (req, res) => {
   console.log(allUsers);
   res.send(allUsers)
 })
+
 
 app.post('/api/users', bodyParser.urlencoded({ extended: false }), async (req, res) => {
   let postedUserName = req.body.username;
@@ -112,10 +106,33 @@ app.post('/api/users', bodyParser.urlencoded({ extended: false }), async (req, r
 });
 
 
-app.post('/api/users/:_id/exercises',bodyParser.urlencoded({ extended: false }),async (req,res)=>{
-  let postedData=req.body;
-  console.log(postedData[':_id']);
-  res.json(postedData);
+app.post('/api/users/:_id/exercises', bodyParser.urlencoded({ extended: false }), async (req, res) => {
+  if (req.params._id === '0') {
+    return res.json({ error: '_id is required' });
+  }
+  if (req.body.description === '') {
+    return res.json({ error: 'description is required' });
+  }
+
+  if (req.body.duration === '') {
+    return res.json({ error: 'duration is required' });
+  }
+  let postedData = req.body;
+  console.log('the post request is:', postedData);
+  let createdExercise = await createExercise(req.params._id, postedData.description, postedData.duration, postedData.date);
+  console.log(createdExercise);
+
+  if (createdExercise != null) {
+    let responseObj = {
+      _id: createdExercise.user_id,
+      username: createdExercise.username,
+      date: createdExercise.date.toDateString(),
+      duration: createdExercise.duration,
+      description: createdExercise.description
+    }
+    res.json(responseObj);
+  }
+
 })
 
 
