@@ -36,17 +36,36 @@ const createUser = async (name) => {
 
 
 // Exercise functions
-const findExercise = async () => {
-
+const findExercise = async (user_id,limit=-1) => {
+  let exercises;
+  
+  if(limit==-1)
+  {
+    exercises = await Exercise.find({user_id:user_id});
+  }
+  else{
+    exercises = await Exercise.find({user_id:user_id}).limit(limit).exec();
+    
+  }
+  if(exercises.length!=0)
+  {
+    console.log('Exercise Found!')
+    console.log(exercises);
+    return exercises;
+  }
+  else{
+    console.log('No exercise found.');
+    return null;
+  }
 }
 
 const createExercise = async (user_id, description, duration, date) => {
   let userDetails = await User.find({ _id: user_id });
-  console.log('Exercise for: ', userDetails);
-  console.log('User ID is: ', user_id);
+  // console.log('Exercise for: ', userDetails);
+  // console.log('User ID is: ', user_id);
   // console.log(userDetails);
   if (userDetails.length != 0) {
-    console.log('user Exist!');
+    // console.log('user Exist!');
     const newExercise = await Exercise.create({
       user_id: user_id,
       username: userDetails[0].username,
@@ -55,11 +74,11 @@ const createExercise = async (user_id, description, duration, date) => {
       date: (date) ? (new Date(date)) : (new Date())
     })
     newExercise.save();
-    console.log('new Exercise created');
+    // console.log('new Exercise created');
     return newExercise;
   }
   else {
-    console.log('user DONT EXIST');
+    // console.log('user DONT EXIST');
     return null;
   }
 }
@@ -77,15 +96,15 @@ app.get('/', (req, res) => {
 app.get('/api/users', async (req, res) => {
   let allUsers = await findUsers();
 
-  console.log("Inside get request")
-  console.log(allUsers);
+  // console.log("Inside get request")
+  // console.log(allUsers);
   res.send(allUsers)
 })
 
 
 app.post('/api/users', bodyParser.urlencoded({ extended: false }), async (req, res) => {
   let postedUserName = req.body.username;
-  console.log("inside post request");
+  // console.log("inside post request");
   // console.log(postedUserName);
 
   //getting the user if exist
@@ -94,7 +113,7 @@ app.post('/api/users', bodyParser.urlencoded({ extended: false }), async (req, r
   if (myUser.length == 0) {
     //No user exist. create one!
     myUser = await createUser(postedUserName);
-    console.log(myUser);
+    // console.log(myUser);
   } else {
     myUser = myUser[0];
   }
@@ -118,9 +137,9 @@ app.post('/api/users/:_id/exercises', bodyParser.urlencoded({ extended: false })
     return res.json({ error: 'duration is required' });
   }
   let postedData = req.body;
-  console.log('the post request is:', postedData);
+  // console.log('the post request is:', postedData);
   let createdExercise = await createExercise(req.params._id, postedData.description, postedData.duration, postedData.date);
-  console.log(createdExercise);
+  // console.log(createdExercise);
 
   if (createdExercise != null) {
     let responseObj = {
@@ -133,6 +152,31 @@ app.post('/api/users/:_id/exercises', bodyParser.urlencoded({ extended: false })
     res.json(responseObj);
   }
 
+})
+
+app.get('/api/users/:_id/logs', async (req, res) => {
+  let user_id = req.params._id;
+  let limit = req.query.limit||-1;
+  console.log('The limit requested is :',limit);
+  console.log('User Requested is: ',user_id);
+  let myUser = await User.findById(user_id);
+  console.log(myUser);
+  let userExercise = await findExercise(user_id,limit);
+  console.log(userExercise);
+  let resObj={
+    _id:myUser._id,
+    username:myUser.username,
+    count:userExercise.length,
+    log:userExercise.map(exercise=>{
+      return {
+        description:exercise.description,
+        duration:exercise.duration,
+        date:exercise.date.toDateString()
+      }
+    })
+  }
+
+  res.json(resObj);
 })
 
 
